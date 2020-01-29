@@ -5,6 +5,29 @@ using RingCentral;
 
 namespace CallForwardingsDemo
 {
+    class NotificationPayload
+    {
+        public NotificationPayloadBody body;
+    }
+
+    class NotificationPayloadBody
+    {
+        public ActiveCall[] activeCalls;
+    }
+
+    class ActiveCall
+    {
+        public string id;
+        public string direction;
+        public string from;
+        public string to;
+        public string toName;
+        public string startTime;
+        public string telephonyStatus;
+        public string sessionId;
+        public string partyId;
+        public string telephonySessionId;
+    }
     class Program
     {
         static void Main(string[] args)
@@ -29,15 +52,20 @@ namespace CallForwardingsDemo
                    {
                        "/restapi/v1.0/account/~/extension/~/presence?detailedTelephonyState=true"
                    };
-                   var subscription = new Subscription(rc, eventFilters, message =>
+                   var subscription = new Subscription(rc, eventFilters, async message =>
                    {
-                       var presenceEvent = JsonConvert.DeserializeObject<DetailedExtensionPresenceEvent>(message);
-                       Console.WriteLine(presenceEvent.body.activeCalls);
-                       foreach (var activeCall in presenceEvent.body.activeCalls)
+                       var payload = JsonConvert.DeserializeObject<NotificationPayload>(message);
+                       Console.WriteLine(payload.body.activeCalls);
+                       foreach (var activeCall in payload.body.activeCalls)
                        {
-                           if (activeCall.telephonyStatus == "Ringing")
+                           if (activeCall.telephonyStatus == "Ringing" && activeCall.direction =="Inbound")
                            {
                                Console.WriteLine("Here I want to forward it!");
+                               var r = await rc.Restapi().Account().Telephony().Sessions(activeCall.telephonySessionId).Parties(activeCall.partyId).Forward().Post(new ForwardTarget
+                               {
+                                   phoneNumber = "+" + Environment.GetEnvironmentVariable("RINGCENTRAL_CALLEE")
+                               });
+                               Console.WriteLine(r.id);
                            }
                        }
                    });
